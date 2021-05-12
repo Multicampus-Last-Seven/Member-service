@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Serials
+from .models import Member, Serials
 from .serializers import SerialsSerializer, MemberCreateSerializer, EmailUniqueCheckSerializer
 from .serializers import MemberLoginSerializer, UseridUniqueCheckSerializer
 from rest_framework.decorators import api_view, permission_classes
@@ -58,11 +58,11 @@ def login(request):
     return Response(response, status=201)
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
-def register_serial(request, pk):
+#@permission_classes([AllowAny])
+def register_serial(request, pk1, pk2):
     if len(request.data) > 2: return Response({'success': False, 'detail': 'Too many data'}, status=400)
     try:
-        result = Serials.objects.filter(pk=pk, name__isnull=True)
+        result = Serials.objects.filter(pk=pk2, name__isnull=True)
         result.update(name=request.data['userid'])
         return Response({'success': True}, status=201)
 

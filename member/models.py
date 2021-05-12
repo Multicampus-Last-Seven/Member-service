@@ -6,7 +6,7 @@ class Serials(models.Model):
     objects = models.Manager
     num = models.CharField(max_length=255, primary_key=True)
     name = models.ForeignKey('Member', related_name='member', on_delete=models.CASCADE,
-     db_column='member_name', blank=True, null=True, default='null')
+     db_column='member_userid', blank=True, null=True, default='null')
 
 class MemberManager(BaseUserManager):
     def _create_user(self, userid, email, password, **etc):
@@ -20,6 +20,7 @@ class MemberManager(BaseUserManager):
     
     def create_user(self, userid, email, password=None, **etc):
         etc.setdefault('is_superuser', False)
+        etc.setdefault('is_staff', True)
         return self._create_user(userid, email, password, **etc)
     
     def create_superuser(self, userid, email, password=None, **etc):
@@ -37,6 +38,8 @@ class Member(AbstractBaseUser, PermissionsMixin):
     road_addr = models.CharField(max_length=191)
     detail_addr = models.CharField(max_length=191)
     is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=True)
+    is_superuser = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = MemberManager()
