@@ -1,0 +1,5 @@
+secrets.json
+__pycache__
+Pipfile
+Pipfile.lock
+db.sqlite3
