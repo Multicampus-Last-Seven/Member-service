@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    #'django.contrib.staticfiles',
+    'django.contrib.staticfiles',
     'member',
     'rest_framework',
     'rest_framework.authtoken',
@@ -68,10 +68,13 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'conf.urls'
 
+SETTINGS_PATH = os.path.dirname(os.path.dirname(__file__))
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates'),
+                 os.path.join(BASE_DIR, 'member', 'templates', 'member')
+                ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -182,3 +185,15 @@ JWT_AUTH = {
 }
 
 AUTH_USER_MODEL = 'member.Member'
+
+email_info = secrets['EMAIL']
+
+EMAIL_USE_TLS = True
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = email_info['email_host']
+EMAIL_HOST_PASSWORD = email_info['email_host_password']
+EMAIL_HOST_USER = email_info['email_host_user']
+EMAIL_PORT = email_info['email_port']
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+STATIC_URL = '/static/'

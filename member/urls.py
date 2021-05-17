@@ -7,5 +7,7 @@ urlpatterns = [
     path('email-check', views.check_email, name='email_check'),
     path('userid-check', views.check_userid, name='userid_check'),
     path('login', views.login, name='login'),
-    path('<str:pk1>/<str:pk2>', views.register_serial, name='serial_registraion')
+    path('activate/<str:userid>/<str:token>', views.activate, name='activate'),
+    path('<str:userid>', views.update_user, name='update_user'),
+    path('<str:userid>/<str:serialid>', views.serial_view, name='serial_view'),
 ]

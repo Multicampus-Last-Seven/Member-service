@@ -69,4 +69,38 @@ class MemberLoginSerializer(serializers.Serializer):
                 'User with given email and password does not exists'
             )
         
-        return {'userid': user.userid, 'token': jwt_token}        
+        return {'userid': user.userid, 'token': jwt_token}
+
+class MemberUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Member
+        fields = ['name', 'password', 'road_addr', 'detail_addr', 'email']
+        extra_kwargs = {
+            'name': {'required': False},
+            'password': {'required': False},
+            'road_addr': {'required': False},
+            'detail_addr': {'required': False},
+            'email': {'required': False}
+        }
+    
+    def validate(self, data):
+        email = data.get('email', None)
+        if email is not None:
+            result = Member.objects.filter(email=email).count()
+            if result != 0: return {'count': 1}
+        return {'count': 0}
+    
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.road_addr = validated_data.get('road_addr', instance.road_addr)
+        instance.detail_addr = validated_data.get('detail_addr', instance.detail_addr)
+        if 'email' in validated_data.keys():
+            instance.email = validated_data['email']
+            instance.is_active = False
+
+        if 'password' in validated_data.keys():
+            instance.set_password(validated_data['password'])
+        
+        instance.save()
+        return instance
+    
