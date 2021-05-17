@@ -46,7 +46,7 @@ def signup(request):
         return Response(data=response, status=status.HTTP_201_CREATED)
 
     response = {'success': False}
-    response['data'] = serializer.errors
+    response['detail'] = serializer.errors
     return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
@@ -105,7 +105,7 @@ def serial_view(request, userid, serialid):
     if request.method == 'POST':
         if len(request.data) > 2:
             return Response({'success': False, 'detail': 'Too many data'}, 
-             status=status.status.HTTP_400_BAD_REQUEST)
+             status=status.HTTP_400_BAD_REQUEST)
         
         try:
             result = Serials.objects.filter(pk=serialid, name__isnull=True)
@@ -121,7 +121,7 @@ def serial_view(request, userid, serialid):
     else:
         if len(request.data) > 2:
             return Response({'success': False, 'detail': 'Too many data'}, 
-             status=status.status.HTTP_400_BAD_REQUEST)
+             status=status.HTTP_400_BAD_REQUEST)
     
     try:
         result = Serials.objects.filter(pk=serialid, name=userid)
@@ -140,7 +140,7 @@ def serial_view(request, userid, serialid):
 def update_user(request, userid):
     if request.method == 'PATCH':
         if len(request.data) > 6: return Response({'success': False, 'detail': 'Too many data'},
-        status=status.status.HTTP_400_BAD_REQUEST)
+        status=status.HTTP_400_BAD_REQUEST)
         
         try:      
             result = Member.objects.get(userid=userid)
@@ -160,7 +160,7 @@ def update_user(request, userid):
                     email = EmailMessage(mail_subject, message, to=[user_email])
                     email.send()
 
-                update_serializer.update(result, request.data)      
+                update_serializer.update(result, request.data)   
                 return Response({'success': True}, status=status.HTTP_200_OK)
             
             else:
