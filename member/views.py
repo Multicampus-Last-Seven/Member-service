@@ -1,6 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
-from rest_framework import serializers, status
-from rest_framework import response
+from rest_framework import status
 from .models import Member, Serials
 from .serializers import SerialsSerializer, MemberCreateSerializer, EmailUniqueCheckSerializer
 from .serializers import MemberLoginSerializer, UseridUniqueCheckSerializer, MemberUpdateSerializer
@@ -15,14 +14,19 @@ from django.core.mail import EmailMessage
 from .token import account_activation_token
 from django.utils.encoding import force_bytes, force_text
 from django.shortcuts import render
-from random import randint
+from .simple_utils import get_new_password
+from .messages import NOT_SUCCESS_RESPONSE, SUCCESS_RESPONSE, ResponseMessage, TOO_MANY_DATA
+from .messages import UNVALID_DATA
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def serialsList(request):
     serials = Serials.objects.all()    
     serializer = SerialsSerializer(instance=serials, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    detail = {'detail': serializer.data}
+    response = ResponseMessage().add(SUCCESS_RESPONSE).add(detail).build()
+    return Response(data=response, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -30,8 +34,7 @@ def signup(request):
     serializer = MemberCreateSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        response = {'success': True}
-        response['data'] = serializer.data
+        response = ResponseMessage().add(SUCCESS_RESPONSE).add(serializer.data).build()
         user = Member.objects.get(pk=request.data['userid'])
         current_site = get_current_site(request) 
         message = render_to_string('member/activate_email.html', {
@@ -45,26 +48,25 @@ def signup(request):
         user_email = user.email
         email = EmailMessage(mail_subject, message, to=[user_email])
         email.send()
-
         return Response(data=response, status=status.HTTP_201_CREATED)
 
-    response = {'success': False}
-    response['detail'] = serializer.errors
+    detail = {'detail': serializer.errors}
+    response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(detail).build()
     return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def check_email(request):
     serializer = EmailUniqueCheckSerializer(data=request.data)
-    if serializer.is_valid(): return Response(data={'success': True}, status=status.HTTP_200_OK)
-    return Response(data={'success': False}, status=status.HTTP_409_CONFLICT)
+    if serializer.is_valid(): return Response(data=SUCCESS_RESPONSE, status=status.HTTP_200_OK)
+    return Response(data=NOT_SUCCESS_RESPONSE, status=status.HTTP_409_CONFLICT)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def check_userid(request):
     serializers = UseridUniqueCheckSerializer(data=request.data)
-    if serializers.is_valid(): return Response(data={'success': True}, status=status.HTTP_200_OK)
-    return Response(data={'success': False}, status=status.HTTP_409_CONFLICT)
+    if serializers.is_valid(): return Response(data=SUCCESS_RESPONSE, status=status.HTTP_200_OK)
+    return Response(data=NOT_SUCCESS_RESPONSE, status=status.HTTP_409_CONFLICT)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -86,65 +88,56 @@ def activate(request, userid, token):
 @permission_classes([AllowAny])
 def login(request):
     if len(request.data) > 2:
-        return Response({'success': False, 'detail': 'Too many data sent'},
-         status=status.HTTP_400_BAD_REQUEST)
+        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
+        return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = MemberLoginSerializer(data=request.data)
     if not serializer.is_valid() or serializer.validated_data['userid'] == 'None':
-        return Response(
-            {'success': False, 'detail': 'ID or password is wrong'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+        return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
     
-    response = {
-        'success': True,
-        'token': serializer.data['token']
-    }
-
-    return Response(response, status=status.HTTP_200_OK)
+    token = {'token': serializer.data['token']}
+    response = ResponseMessage().add(SUCCESS_RESPONSE).add(token).build()
+    return Response(data=response, status=status.HTTP_200_OK)
 
 @api_view(['POST', 'DELETE'])
 #@permission_classes([AllowAny])
 def serial_view(request, userid, serialid):
     if request.method == 'POST':
         if len(request.data) > 2:
-            return Response({'success': False, 'detail': 'Too many data sent'}, 
-             status=status.HTTP_400_BAD_REQUEST)
+            response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             result = Serials.objects.filter(pk=serialid, name__isnull=True)
             result.update(name=request.data['userid'])
-            return Response({'success': True}, status=status.HTTP_200_OK)
+            return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
 
         except:
-            return Response(
-                {'success': False, 'detail': 'The serial number does not exist or is already registered'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
     
     else:
         if len(request.data) > 2:
-            return Response({'success': False, 'detail': 'Too many data sent'}, 
-             status=status.HTTP_400_BAD_REQUEST)
+            response = ResponseMessage().add(SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
     
-    try:
-        result = Serials.objects.filter(pk=serialid, name=userid)
-        result.update(name='null')
-        return Response({'success': True}, status=status.HTTP_200_OK)
-    
-    except:
-        return Response(
-            {'success': False,
-             'detail': '{0} or {1} does not exist'.format(userid, serialid)
-            }
-        )
+        try:
+            result = Serials.objects.filter(pk=serialid, name=userid)
+            result.update(name='null')
+            return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
+        
+        except:
+            response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PATCH', 'DELETE'])
 #@permission_classes([AllowAny])
 def update_user(request, userid):
     if request.method == 'PATCH':
-        if len(request.data) > 6: return Response({'success': False, 'detail': 'Too many data sent'},
-        status=status.HTTP_400_BAD_REQUEST)
+        if len(request.data) > 6: 
+            response = ResponseMessage().add(SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
         
         try:      
             result = Member.objects.get(userid=userid)
@@ -163,73 +156,62 @@ def update_user(request, userid):
                     user_email = result.email
                     email = EmailMessage(mail_subject, message, to=[user_email])
                     email.send()
+                 
 
                 update_serializer.update(result, request.data)   
-                return Response({'success': True}, status=status.HTTP_200_OK)
+                return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
             
             else:
-                return Response({'success': False, 'detail': 'email already exists'},
-                 status=status.HTTP_400_BAD_REQUEST)
+                response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA)
+                return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
-        except ObjectDoesNotExist:
-            return Response({
-                'success': False,
-                'detail': 'Object does not exist'
-            }, status = status.HTTP_400_BAD_REQUEST)
-        
-        except AttributeError:
-            return Response({
-                'success': False,
-                'detail': 'Unvalid input'
-            }, status = status.HTTP_400_BAD_REQUEST)
-        
         except:
-            return Response({
-            'sucess': False,
-            'detail': 'Unknown error'
-        }, status=status.HTTP_400_BAD_REQUEST)
+            response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
     
     else:
-        if len(request.data) > 2: return Response({'success': False, 'detail': 'Too many data sent'},
-        status=status.HTTP_400_BAD_REQUEST)
+        if len(request.data) > 2:
+            response = ResponseMessage().add(SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             result = Member.objects.filter(pk=userid)
             result.delete()
-            return Response({'success': True}, status=status.HTTP_200_OK)
+            return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
         
         except:
-            return Response({
-                'success': False,
-                'detail': 'Object does not exist'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def find_userid(request):
     if len(request.data) > 2:
-        response = {'success': False, 'detail': 'Too many data sent'}
-        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
+        return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        member = Member.objects.get(name=request.data['name'],
-         email=request.data['email'])
+        member = Member.objects.get(
+            name=request.data['name'],
+            email=request.data['email']
+        )
         
-        response = {'success': True, 'detail': {'userid': member.userid}}
-        return Response(response, status=status.HTTP_200_OK)
+        detail = {'detail': {'userid': member.userid}}
+        response = ResponseMessage().add(SUCCESS_RESPONSE).add(detail).build()
+        return Response(data=response, status=status.HTTP_200_OK)
     
     except:
-        response = {'success': False, 'detail': 'not valid name or email'}
-        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+        return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def find_password(request):
     if len(request.data) > 3:
-        response = {'success': False, 'detail': 'Too many data sent'}
-        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
+        return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         member = Member.objects.get(
@@ -238,16 +220,7 @@ def find_password(request):
             email=request.data['email']
         )
      
-        chars = [[str(i) for i in range(10)]]
-        chars.append(['!', '@', '#', '$', '%', '^', '&', '*'])
-        chars.append([chr(i) for i in range(ord('a'), ord('z')+1)])
-        pw = ''
-
-        for _ in range(10):
-            k = randint(0, len(chars)-1)
-            th = randint(0, len(chars[k])-1)
-            pw += chars[k][th]
-
+        pw = get_new_password()
         password = {'password': pw}
         update_serializer = MemberUpdateSerializer()
         update_serializer.update(member, password)
@@ -262,9 +235,8 @@ def find_password(request):
         email = EmailMessage(mail_subject, message, to=[user_email])
         email.send()
 
-        response = {'success': True}
-        return Response(response, status=status.HTTP_200_OK)
+        return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
 
-    except KeyError:
-        response = {'success': False, 'detail': 'ID or E-mail or name is wrong'}
-        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    except:
+        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+        return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
