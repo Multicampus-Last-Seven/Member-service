@@ -1,11 +1,12 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers, status
+from rest_framework import response
 from .models import Member, Serials
 from .serializers import SerialsSerializer, MemberCreateSerializer, EmailUniqueCheckSerializer
 from .serializers import MemberLoginSerializer, UseridUniqueCheckSerializer, MemberUpdateSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.sites.shortcuts import get_current_site
 from django.template.loader import render_to_string
 from django.utils.http import urlsafe_base64_encode,urlsafe_base64_decode
@@ -14,8 +15,10 @@ from django.core.mail import EmailMessage
 from .token import account_activation_token
 from django.utils.encoding import force_bytes, force_text
 from django.shortcuts import render
+from random import randint
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def serialsList(request):
     serials = Serials.objects.all()    
     serializer = SerialsSerializer(instance=serials, many=True)
@@ -83,7 +86,8 @@ def activate(request, userid, token):
 @permission_classes([AllowAny])
 def login(request):
     if len(request.data) > 2:
-        return Response({'success': False, 'detail': 'Too many data'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'success': False, 'detail': 'Too many data sent'},
+         status=status.HTTP_400_BAD_REQUEST)
 
     serializer = MemberLoginSerializer(data=request.data)
     if not serializer.is_valid() or serializer.validated_data['userid'] == 'None':
@@ -104,7 +108,7 @@ def login(request):
 def serial_view(request, userid, serialid):
     if request.method == 'POST':
         if len(request.data) > 2:
-            return Response({'success': False, 'detail': 'Too many data'}, 
+            return Response({'success': False, 'detail': 'Too many data sent'}, 
              status=status.HTTP_400_BAD_REQUEST)
         
         try:
@@ -120,7 +124,7 @@ def serial_view(request, userid, serialid):
     
     else:
         if len(request.data) > 2:
-            return Response({'success': False, 'detail': 'Too many data'}, 
+            return Response({'success': False, 'detail': 'Too many data sent'}, 
              status=status.HTTP_400_BAD_REQUEST)
     
     try:
@@ -139,7 +143,7 @@ def serial_view(request, userid, serialid):
 @permission_classes([AllowAny])
 def update_user(request, userid):
     if request.method == 'PATCH':
-        if len(request.data) > 6: return Response({'success': False, 'detail': 'Too many data'},
+        if len(request.data) > 6: return Response({'success': False, 'detail': 'Too many data sent'},
         status=status.HTTP_400_BAD_REQUEST)
         
         try:      
@@ -186,7 +190,7 @@ def update_user(request, userid):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     else:
-        if len(request.data) > 2: return Response({'success': False, 'detail': 'Too many data'},
+        if len(request.data) > 2: return Response({'success': False, 'detail': 'Too many data sent'},
         status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -199,3 +203,70 @@ def update_user(request, userid):
                 'success': False,
                 'detail': 'Object does not exist'
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def find_userid(request):
+    return Response({'success': True, 'detail': 'hello'}, status=status.HTTP_200_OK)
+    """
+    if len(request.data) > 2:
+        response = {'success': False, 'detail': 'Too many data sent'}
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        member = Member.objects.get(name=request.data['name'],
+         email=request.data['email'])
+        
+        response = {'success': True, 'detail': {'userid': member.userid}}
+        return Response(response, status=status.HTTP_200_OK)
+    
+    except:
+        response = {'success': False, 'detail': 'not valid name or email'}
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    """
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def find_password(request):
+    if len(request.data) > 2:
+        response = {'success': False, 'detail': 'Too many data sent'}
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        member = Member.objects.filter(pk=request.data['userid'])
+        if member.name != request.data['name'] or member.email != request.data['email']:
+            response = {'success': False, 'detail': 'name or email is not correct'}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        
+        chars = [[str(i) for i in range(10)]]
+        chars.append(['!', '@', '#', '$', '%', '^', '&', '*'])
+        chars.append([chr(i) for i in range(ord('a'), ord('z')+1)])
+        pw = ''
+
+        for _ in range(10):
+            k = randint(0, len(chars)-1)
+            th = randint(0, len(chars[k])-1)
+            pw += chars[k][th]
+
+        update_serializer = MemberUpdateSerializer()
+        update_serializer.update(member, pw)
+
+        message = render_to_string('member/new_password.html', {
+            'user': member,
+            'uid': urlsafe_base64_encode(force_bytes(member.userid)).encode().decode(),
+            'password': pw
+        })
+
+        mail_subject = "{0}'s new password"
+        user_email = member.email
+        email = EmailMessage(mail_subject, message, to=[user_email])
+        email.send()
+
+        response = {'success': True}
+        return Response(response, status=status.HTTP_200_OK)
+
+    except:
+        response = {'success': False, 'detail': 'No userid'}
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
