@@ -140,7 +140,7 @@ def serial_view(request, userid, serialid):
         )
 
 @api_view(['PATCH', 'DELETE'])
-@permission_classes([AllowAny])
+#@permission_classes([AllowAny])
 def update_user(request, userid):
     if request.method == 'PATCH':
         if len(request.data) > 6: return Response({'success': False, 'detail': 'Too many data sent'},
@@ -208,8 +208,6 @@ def update_user(request, userid):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def find_userid(request):
-    return Response({'success': True, 'detail': 'hello'}, status=status.HTTP_200_OK)
-    """
     if len(request.data) > 2:
         response = {'success': False, 'detail': 'Too many data sent'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
@@ -224,22 +222,22 @@ def find_userid(request):
     except:
         response = {'success': False, 'detail': 'not valid name or email'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
-    """
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def find_password(request):
-    if len(request.data) > 2:
+    if len(request.data) > 3:
         response = {'success': False, 'detail': 'Too many data sent'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        member = Member.objects.filter(pk=request.data['userid'])
-        if member.name != request.data['name'] or member.email != request.data['email']:
-            response = {'success': False, 'detail': 'name or email is not correct'}
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
-        
+        member = Member.objects.get(
+            userid=request.data['userid'],
+            name=request.data['name'],
+            email=request.data['email']
+        )
+     
         chars = [[str(i) for i in range(10)]]
         chars.append(['!', '@', '#', '$', '%', '^', '&', '*'])
         chars.append([chr(i) for i in range(ord('a'), ord('z')+1)])
@@ -250,16 +248,16 @@ def find_password(request):
             th = randint(0, len(chars[k])-1)
             pw += chars[k][th]
 
+        password = {'password': pw}
         update_serializer = MemberUpdateSerializer()
-        update_serializer.update(member, pw)
+        update_serializer.update(member, password)
 
         message = render_to_string('member/new_password.html', {
             'user': member,
-            'uid': urlsafe_base64_encode(force_bytes(member.userid)).encode().decode(),
             'password': pw
         })
 
-        mail_subject = "{0}'s new password"
+        mail_subject = "{0}'s new password".format(member.userid)
         user_email = member.email
         email = EmailMessage(mail_subject, message, to=[user_email])
         email.send()
@@ -267,6 +265,6 @@ def find_password(request):
         response = {'success': True}
         return Response(response, status=status.HTTP_200_OK)
 
-    except:
-        response = {'success': False, 'detail': 'No userid'}
+    except KeyError:
+        response = {'success': False, 'detail': 'ID or E-mail or name is wrong'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
