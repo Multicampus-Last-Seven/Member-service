@@ -102,13 +102,18 @@ def login(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def serial_alive_view(request, serialid):
-    exist = Serials.objects.filter(pk=serialid).count()
-    if exist > 0:
-        response = Response().add(NOT_SUCCESS_RESPONSE).add(ALREADY_EXIST).build()
-        return Response(data=response, status=status.HTTP_409_CONFLICT)
+    try:
+        serial = Serials.objects.filter(pk=serialid)
+        if serial.is_alive:
+            msg = {'detail': 'It is already alive'}
+            response = Response().add(NOT_SUCCESS_RESPONSE).add(msg).build()
+            return Response(data=response, status=status.HTTP_409_CONFLICT)
         
-    return Response(data=SUCCESS_RESPONSE, status=status.HTTP_200_OK)
+        return Response(data=SUCCESS_RESPONSE, status=status.HTTP_200_OK)
 
+    except:
+        return Response(data=NOT_SUCCESS_RESPONSE, status=status.HTTP_404_NOT_FOUND)
+        
 # The member registers or unregisters serial number of raspberry pi
 @api_view(['POST', 'DELETE'])
 def serial_view(request, userid, serialid):
@@ -141,7 +146,6 @@ def serial_view(request, userid, serialid):
             return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PATCH', 'DELETE'])
-#@permission_classes([AllowAny])
 def update_user(request, userid):
     if request.method == 'PATCH':
         if len(request.data) > 6: 
@@ -164,8 +168,7 @@ def update_user(request, userid):
                     mail_subject = "Verify your e-mail."
                     user_email = result.email
                     email = EmailMessage(mail_subject, message, to=[user_email])
-                    email.send()
-                 
+                    email.send()                 
 
                 update_serializer.update(result, request.data)   
                 return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
@@ -192,7 +195,6 @@ def update_user(request, userid):
             response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
             return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def find_userid(request):
@@ -213,7 +215,6 @@ def find_userid(request):
     except:
         response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
         return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
