@@ -2,6 +2,7 @@ SUCCESS_RESPONSE = {'success': True}
 NOT_SUCCESS_RESPONSE = {'success': True}
 TOO_MANY_DATA = {'detail': 'Too many data are sent'}
 UNVALID_DATA = {'detail': 'Unvalid data'}
+ALREADY_EXIST = {'detail': 'It already exists'}
 
 class ResponseMessage:
 

@@ -16,8 +16,7 @@ from django.utils.encoding import force_bytes, force_text
 from django.shortcuts import render
 from .simple_utils import get_new_password
 from .messages import NOT_SUCCESS_RESPONSE, SUCCESS_RESPONSE, ResponseMessage, TOO_MANY_DATA
-from .messages import UNVALID_DATA
-
+from .messages import UNVALID_DATA, ALREADY_EXIST
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -100,8 +99,18 @@ def login(request):
     response = ResponseMessage().add(SUCCESS_RESPONSE).add(token).build()
     return Response(data=response, status=status.HTTP_200_OK)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def serial_alive_view(request, serialid):
+    exist = Serials.objects.filter(pk=serialid).count()
+    if exist > 0:
+        response = Response().add(NOT_SUCCESS_RESPONSE).add(ALREADY_EXIST).build()
+        return Response(data=response, status=status.HTTP_409_CONFLICT)
+        
+    return Response(data=SUCCESS_RESPONSE, status=status.HTTP_200_OK)
+
+# The member registers or unregisters serial number of raspberry pi
 @api_view(['POST', 'DELETE'])
-#@permission_classes([AllowAny])
 def serial_view(request, userid, serialid):
     if request.method == 'POST':
         if len(request.data) > 2:
