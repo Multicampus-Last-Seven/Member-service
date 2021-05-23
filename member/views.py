@@ -109,6 +109,7 @@ def serial_alive_view(request, serialid):
             response = Response().add(NOT_SUCCESS_RESPONSE).add(msg).build()
             return Response(data=response, status=status.HTTP_409_CONFLICT)
         
+        serial.update(is_alive=True)
         return Response(data=SUCCESS_RESPONSE, status=status.HTTP_200_OK)
 
     except:
