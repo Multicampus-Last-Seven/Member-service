@@ -2,13 +2,13 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
 
-class Serials(models.Model):
+class IoT(models.Model):
     objects = models.Manager
     num = models.CharField(max_length=255, primary_key=True)
-    is_alive = models.BooleanField(default=False)
+    is_alive = models.BooleanField(default=False, null=True)
+    location = models.CharField(max_length=255, default='null', null=True)
     name = models.ForeignKey('Member', related_name='member', on_delete=models.SET_NULL,
      db_column='member_userid', blank=True, null=True, default='null')
-    
 
 class MemberManager(BaseUserManager):
     def _create_user(self, userid, email, password, **etc):

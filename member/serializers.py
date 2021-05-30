@@ -1,15 +1,16 @@
 from django.contrib.auth.models import update_last_login
+from django.core.checks.messages import Error
 from django.db.models import fields
 from rest_framework import serializers
-from .models import Serials, Member
+from .models import IoT, Member
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
 from rest_framework_jwt.settings import api_settings
 
-class SerialsSerializer(serializers.HyperlinkedModelSerializer):
+class IoTSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
-        model = Serials
-        fields = ['num']
+        model = IoT
+        fields = ['num', 'location']
 
 class MemberCreateSerializer(serializers.Serializer):
     userid = serializers.CharField(required=True, validators=[
@@ -101,6 +102,23 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         if 'password' in validated_data.keys():
             instance.set_password(validated_data['password'])
         
+        instance.save()
+        return instance
+
+class MemberRegisterIoTSeriallizer(serializers.ModelSerializer):
+    class meta:
+        model = IoT
+        fields = ['name', 'is_alive', 'location']
+        extra_kwargs = {
+            'name': {'required': False},
+            'is_alive': {'required': False},            
+            'location': {'required': False},
+        }
+    
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('userid', instance.name)
+        instance.is_alive = True
+        instance.location = validated_data.get('location', instance.location)
         instance.save()
         return instance
     

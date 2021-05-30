@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'member',
     'rest_framework',
     'rest_framework.authtoken',
+    'corsheaders',
     #'drf_yasg',
 ]
 
@@ -65,6 +66,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'conf.urls'
@@ -197,3 +199,6 @@ EMAIL_PORT = email_info['email_port']
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 STATIC_URL = '/static/'
+
+CORS_ORIGIN_WHITELIST = ['http://127.0.0.1:3000' ,'http://localhost:3000', 'http://192.168.0.1:3000']
+CORS_ALLOW_CREDENTIALS = True

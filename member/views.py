@@ -1,8 +1,9 @@
 from django.core.exceptions import ObjectDoesNotExist
-from rest_framework import status
-from .models import Member, Serials
-from .serializers import SerialsSerializer, MemberCreateSerializer, EmailUniqueCheckSerializer
+from rest_framework import serializers, status
+from .models import Member, IoT
+from .serializers import IoTSerializer, MemberCreateSerializer, EmailUniqueCheckSerializer
 from .serializers import MemberLoginSerializer, UseridUniqueCheckSerializer, MemberUpdateSerializer
+from .serializers import  MemberRegisterIoTSeriallizer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -20,9 +21,9 @@ from .messages import UNVALID_DATA, ALREADY_EXIST
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def serialsList(request):
-    serials = Serials.objects.all()    
-    serializer = SerialsSerializer(instance=serials, many=True)
+def iots_list(request):
+    iot = IoT.objects.all()    
+    serializer = IoTSerializer(instance=iot, many=True)
     detail = {'detail': serializer.data}
     response = ResponseMessage().add(SUCCESS_RESPONSE).add(detail).build()
     return Response(data=response, status=status.HTTP_200_OK)
@@ -91,25 +92,47 @@ def login(request):
         return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = MemberLoginSerializer(data=request.data)
+    member = None
     if not serializer.is_valid() or serializer.validated_data['userid'] == 'None':
-        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
+        response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(serializer.error_messages).build()
         return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
-    
-    token = {'token': serializer.data['token']}
-    response = ResponseMessage().add(SUCCESS_RESPONSE).add(token).build()
+
+    member = Member.objects.get(userid=request.data['userid'])
+    iots = None
+    try:
+        iots = IoT.objects.filter(name=member.userid).all()
+    except: pass
+
+    additional_data = []
+    if iots is not None:
+        for iot in iots:
+            iot_dict = IoTSerializer(instance=iot).data
+            additional_data.append({
+                "serialNumber": iot_dict['num'],
+                "location": iot_dict['location']
+            })
+
+    response_data = {
+        'name': member.name,
+        'road_addr': member.road_addr,
+        'detail_addr': member.detail_addr,
+        "iots": additional_data
+    }
+    response = ResponseMessage().add(SUCCESS_RESPONSE).add(serializer.data).add(response_data).build()
+    print(response)
     return Response(data=response, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def serial_alive_view(request, serialid):
+def iot_alive_view(request, serialid):
     try:
-        serial = Serials.objects.filter(pk=serialid)
-        if serial.is_alive:
+        iots = IoT.objects.filter(pk=serialid)
+        if iots.is_alive == True:
             msg = {'detail': 'It is already alive'}
             response = Response().add(NOT_SUCCESS_RESPONSE).add(msg).build()
             return Response(data=response, status=status.HTTP_409_CONFLICT)
         
-        serial.update(is_alive=True)
+        iots.update(is_alive=True)
         return Response(data=SUCCESS_RESPONSE, status=status.HTTP_200_OK)
 
     except:
@@ -117,20 +140,30 @@ def serial_alive_view(request, serialid):
         
 # The member registers or unregisters serial number of raspberry pi
 @api_view(['POST', 'DELETE'])
-def serial_view(request, userid, serialid):
+@permission_classes([AllowAny])
+def iot_view(request, userid):
     if request.method == 'POST':
-        if len(request.data) > 2:
+        if len(request.data) > 3:
             response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(TOO_MANY_DATA).build()
             return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            result = Serials.objects.filter(pk=serialid, name__isnull=True)
-            result.update(name=request.data['userid'])
-            return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
+            exist = IoT.objects.filter(name=userid).exists()
+            if exist:
+                iots = IoT.objects.filter(name=userid).all()
+                iots.update(name=None)
+            
+            iots = request.data['iots']
+            for iot in iots:
+                if not iot['serialNumber']: continue
+                new_iot = IoT.objects.filter(num=iot["serialNumber"])
+                new_iot.update(name=userid, is_alive=True, location=iot['location'])
 
-        except:
+            return Response(data=SUCCESS_RESPONSE, status=status.HTTP_202_ACCEPTED)
+                
+        except :
             response = ResponseMessage().add(NOT_SUCCESS_RESPONSE).add(UNVALID_DATA).build()
-            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data=response, status=status.HTTP_404_NOT_FOUND)
     
     else:
         if len(request.data) > 2:
@@ -138,8 +171,8 @@ def serial_view(request, userid, serialid):
             return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
     
         try:
-            result = Serials.objects.filter(pk=serialid, name=userid)
-            result.update(name='null')
+            result = IoT.objects.filter(pk=request.data, name=userid)
+            result.update(name='null', is_alive=False)
             return Response(SUCCESS_RESPONSE, status=status.HTTP_200_OK)
         
         except:
